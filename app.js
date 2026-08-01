@@ -50,11 +50,17 @@ async function sendMessage() {
 
         const data = await response.json();
         chatBox.removeChild(loadingMsg);
-        addMessage(data.reply, 'bot');
+        
+        if (data.reply) {
+            addMessage(data.reply, 'bot');
+        } else {
+            addMessage('Received unexpected response from server.', 'bot');
+        }
 
     } catch (error) {
         chatBox.removeChild(loadingMsg);
-        addMessage('Error connecting. Please refresh.', 'bot');
+        console.error('Chat API Error:', error);
+        addMessage(`Connection error: ${error.message || 'Server unavailable'}. Please check environment settings.`, 'bot');
     }
 
     sendBtn.disabled = false;
