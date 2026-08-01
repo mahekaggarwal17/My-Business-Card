@@ -1,5 +1,4 @@
 const express = require('express');
-const { AzureOpenAI, OpenAI } = require('openai');
 const path = require('path');
 
 const app = express();
@@ -12,53 +11,100 @@ app.post('/api/chat', async (req, res) => {
     try {
         const { message, systemPrompt } = req.body;
 
-        let client;
-        let modelName;
-        let extraBody = undefined;
+        const nvidiaKey = process.env.NVIDIA_API_KEY;
+        const azureKey = process.env.AZURE_OPENAI_KEY;
+        const azureEndpoint = process.env.AZURE_OPENAI_ENDPOINT;
+        const openaiKey = process.env.OPENAI_API_KEY;
 
-        if (process.env.NVIDIA_API_KEY) {
-            client = new OpenAI({
-                baseURL: process.env.NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com/v1',
-                apiKey: process.env.NVIDIA_API_KEY
+        let replyText = "";
+
+        if (nvidiaKey && nvidiaKey.trim()) {
+            const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${nvidiaKey.trim()}`
+                },
+                body: JSON.stringify({
+                    model: process.env.NVIDIA_MODEL || 'nvidia/nemotron-3-nano-30b-a3b',
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: message }
+                    ],
+                    temperature: 0.7,
+                    max_tokens: 500
+                })
             });
-            modelName = process.env.NVIDIA_MODEL || 'nvidia/nemotron-3-nano-30b-a3b';
-            extraBody = { reasoning_budget: 16384 };
-        } else if (process.env.AZURE_OPENAI_KEY && process.env.AZURE_OPENAI_ENDPOINT) {
-            client = new AzureOpenAI({
-                endpoint: process.env.AZURE_OPENAI_ENDPOINT,
-                apiKey: process.env.AZURE_OPENAI_KEY,
-                apiVersion: process.env.AZURE_OPENAI_API_VERSION || '2024-02-15-preview',
-                deployment: process.env.AZURE_OPENAI_DEPLOYMENT
+
+            const data = await response.json();
+            if (data.choices && data.choices[0] && data.choices[0].message) {
+                replyText = data.choices[0].message.content;
+            } else if (data.error) {
+                replyText = `NVIDIA API Error: ${data.error.message || JSON.stringify(data.error)}`;
+            } else {
+                replyText = "Error retrieving response from NVIDIA API.";
+            }
+        } else if (azureKey && azureEndpoint) {
+            const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o-mini';
+            const apiVersion = process.env.AZURE_OPENAI_API_VERSION || '2024-02-15-preview';
+            const url = `${azureEndpoint.replace(/\/$/, '')}/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`;
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'api-key': azureKey.trim()
+                },
+                body: JSON.stringify({
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: message }
+                    ],
+                    max_tokens: 500
+                })
             });
-            modelName = process.env.AZURE_OPENAI_DEPLOYMENT;
-        } else if (process.env.OPENAI_API_KEY) {
-            client = new OpenAI({
-                apiKey: process.env.OPENAI_API_KEY
+
+            const data = await response.json();
+            if (data.choices && data.choices[0] && data.choices[0].message) {
+                replyText = data.choices[0].message.content;
+            } else if (data.error) {
+                replyText = `Azure OpenAI Error: ${data.error.message || JSON.stringify(data.error)}`;
+            } else {
+                replyText = "Error retrieving response from Azure OpenAI.";
+            }
+        } else if (openaiKey && openaiKey.trim()) {
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${openaiKey.trim()}`
+                },
+                body: JSON.stringify({
+                    model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: message }
+                    ],
+                    max_tokens: 500
+                })
             });
-            modelName = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+
+            const data = await response.json();
+            if (data.choices && data.choices[0] && data.choices[0].message) {
+                replyText = data.choices[0].message.content;
+            } else {
+                replyText = "Error retrieving response from OpenAI.";
+            }
         } else {
-            return res.status(500).json({ reply: 'Server Error: API key is not configured.' });
+            return res.status(500).json({
+                reply: "Configuration error: Neither NVIDIA_API_KEY, AZURE_OPENAI_KEY, nor OPENAI_API_KEY is configured."
+            });
         }
 
-        const payload = {
-            model: modelName,
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: message }
-            ],
-            max_tokens: 1024
-        };
-
-        if (extraBody) {
-            payload.extra_body = extraBody;
-        }
-
-        const response = await client.chat.completions.create(payload);
-
-        res.json({ reply: response.choices[0].message.content });
+        res.json({ reply: replyText });
     } catch (error) {
         console.error('Chat API Error:', error);
-        res.status(500).json({ reply: 'Error connecting to AI service. Please try again later.' });
+        res.status(500).json({ reply: `Server Error: ${error.message || error}` });
     }
 });
 
