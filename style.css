@@ -204,3 +204,47 @@ button:disabled {
     opacity: 0.4;
     cursor: not-allowed;
 }
+
+/* Social Link Buttons (Bonus Task) */
+.social-links {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.social-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 18px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    border: 1px solid #2a2a4a;
+}
+
+.github-btn {
+    background: #1a1a2e;
+    color: #e2e8f0;
+}
+
+.github-btn:hover {
+    background: #2a2a4a;
+    color: #ffffff;
+    transform: translateY(-2px);
+}
+
+.linkedin-btn {
+    background: #0077b5;
+    color: #ffffff;
+    border-color: #0077b5;
+}
+
+.linkedin-btn:hover {
+    background: #005885;
+    opacity: 0.95;
+    transform: translateY(-2px);
+}
