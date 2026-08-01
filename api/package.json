@@ -3,7 +3,8 @@
     "version": "1.0.0",
     "main": "src/functions/chat.js",
     "scripts": {
-        "start": "func start"
+        "start": "func start",
+        "build": "echo 'No API build required'"
     },
     "dependencies": {
         "openai": "^4.0.0",
